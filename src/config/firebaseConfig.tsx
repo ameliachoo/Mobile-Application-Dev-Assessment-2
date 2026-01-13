@@ -5,23 +5,25 @@ import { getFirestore } from 'firebase/firestore';
 /**
  * Firebase Configuration
  * 
- * - initialises firebase services for the app.
- * - provides authentication and Firestore database functionality.
+ * Initializes Firebase services for the app.
+ * Provides authentication and Firestore database functionality.
+ * Configuration values are loaded from environment variables.
  */
 const firebaseConfig = {
-  apiKey: "AIzaSyDF-W2Ca9NnTXE1AZ_5woqwndeNGOZVnik",
-  authDomain: "mobileappdev-7036d.firebaseapp.com",
-  projectId: "mobileappdev-7036d",
-  storageBucket: "mobileappdev-7036d.firebasestorage.app",
-  messagingSenderId: "9149065932",
-  appId: "1:9149065932:web:62d035c389e8cc83317069",
-  measurementId: "G-GHBM8SZJVJ"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// initialise firebase app instance.
+// Initialize Firebase app instance
 const app = initializeApp(firebaseConfig);
 
-// export firebase auth service.
+// Export Firebase authentication service
 export const auth = getAuth(app);
-// export firestore data service
+
+// Export Firestore database service
 export const db = getFirestore(app);
