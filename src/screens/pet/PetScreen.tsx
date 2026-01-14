@@ -14,13 +14,26 @@ export const PetScreen = ({ navigation }: any) => {
   const theme = isDarkMode ? colors.dark : colors.light;
   const { heartPoints } = usePoints();
   
+  // lifetime points determine pet level.
   const [lifetimePoints, setLifetimePoints] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  /**
+   * Component Initialization Hook
+   * 
+   * - loads lifetime points from Firestore on component mount.
+   */
   useEffect(() => {
     loadLifetimePoints();
   }, []);
 
+  /**
+   * Load Lifetime Points
+   * 
+   * - retrieves the user's total lifetime points from Firestore.
+   * - lifetime points are the cumulative total of all points ever earned.
+   * 
+   */
   const loadLifetimePoints = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -34,6 +47,7 @@ export const PetScreen = ({ navigation }: any) => {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
+        // lifetimePoints is stored in firestore and updated by PointsContext.
         setLifetimePoints(data.lifetimePoints || 0);
       }
     } catch (error) {
@@ -43,12 +57,14 @@ export const PetScreen = ({ navigation }: any) => {
     }
   };
 
-  // Calculate level based on lifetime points
-  // Level 1: 0-99 points
-  // Level 2: 100-299 points  
-  // Level 3: 300-599 points
-  // Level 4: 600-999 points
-  // And so on with increasing requirements
+  /**
+   * Calculate Level
+   * 
+   * - lvl 1: 0-99 points
+   * - lvl 2: 100-299 points  
+   * - lvl 3: 300-599 points
+   * - lvl 4: 600-999 points
+   */
   const calculateLevel = (points: number): number => {
     if (points < 100) return 1;
     if (points < 300) return 2;
@@ -60,10 +76,14 @@ export const PetScreen = ({ navigation }: any) => {
     if (points < 3600) return 8;
     if (points < 4500) return 9;
     
-    // For levels 10+, each level requires 1000 more points
     return Math.floor((points - 4500) / 1000) + 10;
   };
 
+  /**
+   * Get Points for Next Level
+   * 
+   * - used to calculate progress bar and remaining points display.
+   */
   const getPointsForNextLevel = (currentLevel: number): number => {
     if (currentLevel === 1) return 100;
     if (currentLevel === 2) return 300;
@@ -75,22 +95,29 @@ export const PetScreen = ({ navigation }: any) => {
     if (currentLevel === 8) return 3600;
     if (currentLevel === 9) return 4500;
     
-    // For levels 10+
     return 4500 + (currentLevel - 9) * 1000;
   };
 
+  /**
+   * Get Points for Current Level
+   * 
+   * - returns the minimum points required to be at the current level.
+   * - used to calculate how many points into the current level the user is.
+   */
   const getPointsForCurrentLevel = (currentLevel: number): number => {
     if (currentLevel === 1) return 0;
     return getPointsForNextLevel(currentLevel - 1);
   };
 
+  // calculate current level and progress.
   const currentLevel = calculateLevel(lifetimePoints);
   const pointsForCurrentLevel = getPointsForCurrentLevel(currentLevel);
   const pointsForNextLevel = getPointsForNextLevel(currentLevel);
   const pointsIntoLevel = lifetimePoints - pointsForCurrentLevel;
   const pointsNeededForLevel = pointsForNextLevel - pointsForCurrentLevel;
-  const xpPercentage = (pointsIntoLevel / pointsNeededForLevel) * 100;
+  const xpPercentage = (pointsIntoLevel / pointsNeededForLevel) * 100; 
 
+  // show loading state while fetching data.
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -102,6 +129,7 @@ export const PetScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* heart points display. */}
       <View style={styles.pointsContainer}>
         <View style={[styles.pointsBox, {
           backgroundColor: isDarkMode ? '#2a2a2a' : '#e8e8e8',
@@ -117,15 +145,18 @@ export const PetScreen = ({ navigation }: any) => {
         </View>
       </View>
 
+      {/* theme toggle button. */}
       <View style={styles.themeToggleContainer}>
         <ThemeToggle />
       </View>
 
       <View style={styles.content}>
+        {/* pet display card with placeholder icon. */}
         <View style={[styles.petCard, {
           backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
         }]}>
           <View style={styles.petDisplay}>
+            {/* placeholder paw icon. */}
             <Ionicons 
               name="paw" 
               size={120} 
@@ -134,10 +165,13 @@ export const PetScreen = ({ navigation }: any) => {
           </View>
         </View>
 
+        {/* level display and xp progress bar. */}
         <View style={styles.levelContainer}>
+          {/* current level number. */}
           <Text style={[styles.levelText, { color: theme.text }]}>
             Lvl {currentLevel}
           </Text>
+          {/* xp progress bar. */}
           <View style={[styles.levelProgressBar, {
             backgroundColor: isDarkMode ? '#3a3a3a' : '#d0d0d0',
           }]}>
@@ -146,14 +180,17 @@ export const PetScreen = ({ navigation }: any) => {
               width: `${Math.min(xpPercentage, 100)}%`,
             }]} />
           </View>
+          {/* progress text showing points into level / total needed. */}
           <Text style={[styles.xpText, { color: isDarkMode ? '#888' : '#666' }]}>
             {pointsIntoLevel}/{pointsNeededForLevel}
           </Text>
         </View>
 
+        {/* statistics card. */}
         <View style={[styles.statsCard, {
           backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
         }]}>
+          {/* lifetime points total. */}
           <View style={styles.statItem}>
             <Text style={[styles.statLabel, { color: isDarkMode ? '#888' : '#666' }]}>
               Lifetime Points
@@ -162,6 +199,7 @@ export const PetScreen = ({ navigation }: any) => {
               {lifetimePoints.toLocaleString()}
             </Text>
           </View>
+          {/* points remaining to next level. */}
           <View style={styles.statItem}>
             <Text style={[styles.statLabel, { color: isDarkMode ? '#888' : '#666' }]}>
               Next Level
@@ -172,6 +210,7 @@ export const PetScreen = ({ navigation }: any) => {
           </View>
         </View>
 
+        {/* customize button navigates to shop. */}
         <TouchableOpacity 
           style={[styles.customizeButton, {
             backgroundColor: isDarkMode ? '#3a3a3a' : '#d0d0d0',

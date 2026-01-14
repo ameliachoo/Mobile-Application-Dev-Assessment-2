@@ -10,7 +10,12 @@ import { auth, db } from '../../config/firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { useFocusEffect } from '@react-navigation/native';
 
-
+/**
+ * Nutrition Data Interface
+ * 
+ * - stores all daily nutrition tracking data in Firestore.
+ * - lastReset is used to detect midnight boundaries for daily resets.
+ */
 interface NutritionData {
   waterGlasses: number;
   vegetables: number;
@@ -19,9 +24,12 @@ interface NutritionData {
   sleepHours: number;
   mindfulMinutes: number;
   meals: Meal[];
-  lastReset: string;
+  lastReset: string; // ISO timestamp for detecting daily reset
 }
 
+/**
+ * Meal Interface
+ */
 interface Meal {
   id: string;
   name: string;
@@ -36,6 +44,7 @@ export const HealthScreen = ({ navigation }: any) => {
   const theme = isDarkMode ? colors.dark : colors.light;
   const { heartPoints, addPoints, incrementTasksCompleted } = usePoints();
 
+  // nutrition tracking state.
   const [loading, setLoading] = useState(true);
   const [waterGlasses, setWaterGlasses] = useState(0);
   const [vegetables, setVegetables] = useState(0);
@@ -45,6 +54,7 @@ export const HealthScreen = ({ navigation }: any) => {
   const [mindfulMinutes, setMindfulMinutes] = useState(0);
   const [meals, setMeals] = useState<Meal[]>([]);
 
+  // modal state for meal and protein input.
   const [showMealModal, setShowMealModal] = useState(false);
   const [showProteinModal, setShowProteinModal] = useState(false);
   const [newMealName, setNewMealName] = useState('');
@@ -52,12 +62,25 @@ export const HealthScreen = ({ navigation }: any) => {
   const [newMealCalories, setNewMealCalories] = useState('');
   const [proteinInput, setProteinInput] = useState('');
 
+  /**
+   * Focus Effect Hook
+   * 
+   * - reloads nutrition data whenever the screen is used.
+   */
   useFocusEffect(
     React.useCallback(() => {
       loadNutritionData();
     }, [])
   );
 
+  /**
+   * Load Nutrition Data
+   * 
+   * - retrieves users nutrition data from Firestore and handles daily reset logic.
+   * - compares lastReset timestamp with current date to determine if it's a new day.
+   * - if new day detected, resets all tracking data.
+   * - creates initial data document for first time users.
+   */
   const loadNutritionData = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -80,6 +103,7 @@ export const HealthScreen = ({ navigation }: any) => {
           await resetNutritionData(user.uid);
         } else {
           console.log('Loading existing nutrition data');
+          // load all existing nutrition data from firestore.
           setWaterGlasses(data.waterGlasses || 0);
           setVegetables(data.vegetables || 0);
           setFruits(data.fruits || 0);
@@ -100,6 +124,13 @@ export const HealthScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Reset Nutrition Data
+   * 
+   * - resets all tracking data to zero for a new day.
+   * - called automatically at midnight or manually by user.
+   * - updates both Firestore and local state.
+   */
   const resetNutritionData = async (userId: string) => {
     const initialData: NutritionData = {
       waterGlasses: 0,
@@ -114,6 +145,7 @@ export const HealthScreen = ({ navigation }: any) => {
 
     await setDoc(doc(db, 'nutritionData', userId), initialData);
 
+    // reset all local state to match firestore.
     setWaterGlasses(0);
     setVegetables(0);
     setFruits(0);
@@ -123,6 +155,11 @@ export const HealthScreen = ({ navigation }: any) => {
     setMeals([]);
   };
 
+  /**
+   * Update Firebase
+   * 
+   * - helper function to update specific fields in Firestore.
+   */
   const updateFirebase = async (updates: Partial<NutritionData>) => {
     const user = auth.currentUser;
     if (!user) return;
@@ -135,11 +172,17 @@ export const HealthScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Add Water
+   * 
+   * - awards 50 points when 8 glasses goal is reached.
+   */
   const handleAddWater = async () => {
     const newCount = waterGlasses + 1;
     setWaterGlasses(newCount);
     await updateFirebase({ waterGlasses: newCount });
     
+    // check if 8 glass goal is met.
     if (newCount === 8) {
       await addPoints(50, false);
       await incrementTasksCompleted();
@@ -147,6 +190,11 @@ export const HealthScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Remove Water
+   * 
+   * - decrements water glass count.
+   */
   const handleRemoveWater = async () => {
     if (waterGlasses > 0) {
       const newCount = waterGlasses - 1;
@@ -155,11 +203,17 @@ export const HealthScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Add Vegetable
+   * 
+   * - awards 75 points when 5 servings goal is reached.
+   */
   const handleAddVegetable = async () => {
     const newCount = vegetables + 1;
     setVegetables(newCount);
     await updateFirebase({ vegetables: newCount });
     
+    // check if 5 servings goal is met.
     if (newCount === 5) {
       await addPoints(75, false);
       await incrementTasksCompleted();
@@ -167,6 +221,11 @@ export const HealthScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Remove Vegetable
+   * 
+   * - decrements vegetable serving count.
+   */
   const handleRemoveVegetable = async () => {
     if (vegetables > 0) {
       const newCount = vegetables - 1;
@@ -175,11 +234,17 @@ export const HealthScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Add Fruit
+   *
+   * awards 50 points when 3 servings goal is reached.
+   */
   const handleAddFruit = async () => {
     const newCount = fruits + 1;
     setFruits(newCount);
     await updateFirebase({ fruits: newCount });
     
+    // check if 3 servings goal is met.
     if (newCount === 3) {
       await addPoints(50, false);
       await incrementTasksCompleted();
@@ -187,6 +252,11 @@ export const HealthScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Remove Fruit
+   * 
+   * - decrements fruit serving count.
+   */
   const handleRemoveFruit = async () => {
     if (fruits > 0) {
       const newCount = fruits - 1;
@@ -195,10 +265,22 @@ export const HealthScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Add Protein
+   * 
+   * - opens modal for protein input.
+   */
   const handleAddProtein = () => {
     setShowProteinModal(true);
   };
 
+  /**
+   * Handle Submit Protein
+   * 
+   * - validates and adds protein grams to daily total.
+   * - awards 60 points when 100g protein goal is reached.
+   * - validates input is between 1-200g for reasonable values.
+   */
   const handleSubmitProtein = async () => {
     const grams = parseInt(proteinInput || '0');
     if (grams > 0 && grams <= 200) {
@@ -206,6 +288,7 @@ export const HealthScreen = ({ navigation }: any) => {
       setProteinGrams(newTotal);
       await updateFirebase({ proteinGrams: newTotal });
       
+      // check if 100g goal is met for the first time today.
       if (newTotal >= 100 && proteinGrams < 100) {
         await addPoints(60, false);
         await incrementTasksCompleted();
@@ -219,6 +302,12 @@ export const HealthScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Add Meal
+   * 
+   * - validates and logs a new meal with nutritional information.
+   * - awards 30 points for each meal logged.
+   */
   const handleAddMeal = async () => {
     if (!newMealName || !newMealItems || !newMealCalories) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -243,10 +332,16 @@ export const HealthScreen = ({ navigation }: any) => {
     setNewMealItems('');
     setNewMealCalories('');
 
+    // award points for logging meal.
     await addPoints(30, false);
     Alert.alert('Meal Logged!', 'Keep tracking your nutrition! +30 points');
   };
 
+  /**
+   * Handle Delete Meal
+   * 
+   * - removes a meal from the log after user confirmation.
+   */
   const handleDeleteMeal = async (id: string) => {
     Alert.alert(
       'Delete Meal',
@@ -266,6 +361,12 @@ export const HealthScreen = ({ navigation }: any) => {
     );
   };
 
+  /**
+   * Handle Manual Reset
+   * 
+   * - allows user to manually reset all nutrition data for the day.
+   * - requires confirmation to prevent accidental resets.
+   */
   const handleManualReset = () => {
     Alert.alert(
       'Reset All Data',
@@ -287,13 +388,20 @@ export const HealthScreen = ({ navigation }: any) => {
     );
   };
 
+  /**
+   * Calculate Progress
+   * 
+   * - calculates progress percentage for nutrition goals.
+   */
   const calculateProgress = (current: number, goal: number) => {
     return Math.min((current / goal) * 100, 100);
   };
 
+  // calculate meal statistics.
   const totalCalories = meals.reduce((sum, meal) => sum + meal.calories, 0);
   const healthyMealCount = meals.filter(m => m.healthy).length;
 
+  // daily nutrition challenges with goals and rewards.
   const nutritionChallenges = [
     { id: '1', title: 'Drink 8 glasses of water', progress: waterGlasses, goal: 8, icon: 'water', color: '#00BCD4', reward: 50 },
     { id: '2', title: 'Eat 5 servings of vegetables', progress: vegetables, goal: 5, icon: 'leaf', color: '#4CAF50', reward: 75 },
@@ -301,6 +409,7 @@ export const HealthScreen = ({ navigation }: any) => {
     { id: '4', title: 'Eat 3 servings of fruit', progress: fruits, goal: 3, icon: 'nutrition', color: '#FF9800', reward: 50 },
   ];
 
+ // show loading state while fetching data
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -312,7 +421,10 @@ export const HealthScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* theme toggle button. */}
       <ThemeToggle />
+      
+      {/* heart points display in top left. */}
       <View style={styles.pointsContainer}>
         <View style={[styles.pointsBox, {
           backgroundColor: isDarkMode ? '#2a2a2a' : '#e8e8e8',
@@ -324,12 +436,15 @@ export const HealthScreen = ({ navigation }: any) => {
         </View>
       </View>
 
+      {/* back navigation button. */}
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
         <Ionicons name="arrow-back" size={28} color={theme.text} />
       </TouchableOpacity>
+
+      {/* manual reset button for clearing all data. */}
       <TouchableOpacity 
         style={styles.resetButton}
         onPress={handleManualReset}
@@ -341,10 +456,13 @@ export const HealthScreen = ({ navigation }: any) => {
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           NUTRITION & WELLNESS
         </Text>
+
+        {/* overview card showing daily meal statistics. */}
         <View style={[styles.overviewCard, {
           backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
         }]}>
           <View style={styles.overviewRow}>
+            {/* total meals logged today. */}
             <View style={styles.overviewItem}>
               <Ionicons name="restaurant" size={24} color="#FF9800" />
               <Text style={[styles.overviewValue, { color: theme.text }]}>
@@ -355,6 +473,7 @@ export const HealthScreen = ({ navigation }: any) => {
               </Text>
             </View>
 
+            {/* total calories consumed today. */}
             <View style={styles.overviewItem}>
               <Ionicons name="flame" size={24} color="#FF5722" />
               <Text style={[styles.overviewValue, { color: theme.text }]}>
@@ -365,6 +484,7 @@ export const HealthScreen = ({ navigation }: any) => {
               </Text>
             </View>
 
+            {/* ratio of healthy to total meals. */}
             <View style={styles.overviewItem}>
               <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
               <Text style={[styles.overviewValue, { color: theme.text }]}>
@@ -377,21 +497,26 @@ export const HealthScreen = ({ navigation }: any) => {
           </View>
         </View>
 
+        {/* quick tracking section header. */}
         <Text style={[styles.sectionTitle, { color: isDarkMode ? '#888' : '#666' }]}>
           QUICK TRACK
         </Text>
 
+        {/* grid of quick add cards for tracking nutrition. */}
         <View style={styles.quickAddGrid}>
+          {/* water tracking card with add/remove buttons. */}
           <View style={[styles.quickAddCard, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
           }]}>
             <Ionicons name="water" size={32} color="#00BCD4" />
+            {/* current water count. */}
             <Text style={[styles.quickAddCount, { color: theme.text }]}>
               {waterGlasses}
             </Text>
             <Text style={[styles.quickAddLabel, { color: isDarkMode ? '#888' : '#666' }]}>
               / 8 glasses
             </Text>
+            {/* progress bar showing completion percentage. */}
             <View style={[styles.miniProgress, {
               backgroundColor: isDarkMode ? '#3a3a3a' : '#e0e0e0',
             }]}>
@@ -400,6 +525,7 @@ export const HealthScreen = ({ navigation }: any) => {
                 width: `${calculateProgress(waterGlasses, 8)}%`,
               }]} />
             </View>
+            {/* increment and decrement buttons. */}
             <View style={styles.cardButtons}>
               <TouchableOpacity 
                 style={[styles.minusButton, { backgroundColor: '#FF5252' }]}
@@ -416,6 +542,7 @@ export const HealthScreen = ({ navigation }: any) => {
             </View>
           </View>
 
+          {/* vegetables tracking card. */}
           <View style={[styles.quickAddCard, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
           }]}>
@@ -450,6 +577,7 @@ export const HealthScreen = ({ navigation }: any) => {
             </View>
           </View>
 
+          {/* fruits tracking card. */}
           <View style={[styles.quickAddCard, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
           }]}>
@@ -484,6 +612,7 @@ export const HealthScreen = ({ navigation }: any) => {
             </View>
           </View>
 
+          {/* protein tracking card. */}
           <TouchableOpacity 
             style={[styles.quickAddCard, {
               backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -505,16 +634,19 @@ export const HealthScreen = ({ navigation }: any) => {
                 width: `${calculateProgress(proteinGrams, 100)}%`,
               }]} />
             </View>
+            {/* add button overlay. */}
             <View style={[styles.addButtonCard, { backgroundColor: '#4CAF50 ' }]}>
               <Ionicons name="add" size={16} color="#fff" />
             </View>
           </TouchableOpacity>
         </View>
 
+        {/* meals section header. */}
         <Text style={[styles.sectionTitle, { color: isDarkMode ? '#888' : '#666' }]}>
           TODAY'S MEALS
         </Text>
 
+        {/* show empty state if no meals logged. */}
         {meals.length === 0 ? (
           <View style={[styles.emptyState, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -534,6 +666,7 @@ export const HealthScreen = ({ navigation }: any) => {
               onLongPress={() => handleDeleteMeal(meal.id)}
             >
               <View style={styles.mealLeft}>
+                {/* icon shows green checkmark if healthy, orange alert if not. */}
                 <View style={[styles.mealIcon, {
                   backgroundColor: meal.healthy ? '#4CAF50' : '#FF9800',
                 }]}>
@@ -544,12 +677,15 @@ export const HealthScreen = ({ navigation }: any) => {
                   />
                 </View>
                 <View style={styles.mealInfo}>
+                  {/* meal name. */}
                   <Text style={[styles.mealName, { color: theme.text }]}>
                     {meal.name}
                   </Text>
+                  {/* meal description/items. */}
                   <Text style={[styles.mealItems, { color: isDarkMode ? '#888' : '#666' }]}>
                     {meal.items}
                   </Text>
+                  {/* time logged and calorie count. */}
                   <View style={styles.mealMeta}>
                     <Ionicons name="time-outline" size={14} color={isDarkMode ? '#888' : '#666'} />
                     <Text style={[styles.mealTime, { color: isDarkMode ? '#888' : '#666' }]}>
@@ -565,6 +701,7 @@ export const HealthScreen = ({ navigation }: any) => {
           ))
         )}
 
+        {/* button to open meal logging modal. */}
         <TouchableOpacity
           style={[styles.addMealButton, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -578,10 +715,12 @@ export const HealthScreen = ({ navigation }: any) => {
           </Text>
         </TouchableOpacity>
 
+        {/* daily challenges section header. */}
         <Text style={[styles.sectionTitle, { color: isDarkMode ? '#888' : '#666' }]}>
           DAILY CHALLENGES
         </Text>
 
+        {/* map through nutrition challenges. */}
         {nutritionChallenges.map((challenge) => {
           const completed = challenge.progress >= challenge.goal;
           return (
@@ -592,6 +731,7 @@ export const HealthScreen = ({ navigation }: any) => {
               }]}
             >
               <View style={styles.challengeLeft}>
+                {/* challenge icon with colored background. */}
                 <View style={[styles.challengeIcon, {
                   backgroundColor: challenge.color + '20',
                 }]}>
@@ -605,12 +745,14 @@ export const HealthScreen = ({ navigation }: any) => {
                   <Text style={[styles.challengeTitle, { color: theme.text }]}>
                     {challenge.title}
                   </Text>
+                  {/* progress indicator. */}
                   <Text style={[styles.challengeProgress, { color: isDarkMode ? '#888' : '#666' }]}>
                     {challenge.progress} / {challenge.goal}
                   </Text>
                 </View>
               </View>
               <View style={styles.challengeRight}>
+                {/* point reward amount. */}
                 <Text style={[styles.challengeReward, { color: '#FFD700' }]}>
                   +{challenge.reward}
                 </Text>
@@ -622,6 +764,7 @@ export const HealthScreen = ({ navigation }: any) => {
           );
         })}
 
+        {/* informational tip card about daily resets. */}
         <View style={[styles.tipCard, {
           backgroundColor: isDarkMode ? '#2a2a2a' : '#fff3e0',
         }]}>
@@ -644,6 +787,7 @@ export const HealthScreen = ({ navigation }: any) => {
               Log a Meal
             </Text>
 
+            {/* input for meal name. */}
             <TextInput
               style={[styles.modalInput, {
                 backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -655,6 +799,7 @@ export const HealthScreen = ({ navigation }: any) => {
               onChangeText={setNewMealName}
             />
 
+            {/* input for meal description. */}
             <TextInput
               style={[styles.modalInput, {
                 backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -666,6 +811,7 @@ export const HealthScreen = ({ navigation }: any) => {
               onChangeText={setNewMealItems}
             />
 
+            {/* input for calorie count. */}
             <TextInput
               style={[styles.modalInput, {
                 backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -705,6 +851,7 @@ export const HealthScreen = ({ navigation }: any) => {
         </View>
       </Modal>
 
+      {/* modal for adding protein. */}
       <Modal
         visible={showProteinModal}
         transparent
@@ -717,6 +864,7 @@ export const HealthScreen = ({ navigation }: any) => {
               Add Protein
             </Text>
 
+            {/* input for protein grams. */}
             <TextInput
               style={[styles.modalInput, {
                 backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
