@@ -9,6 +9,12 @@ import { auth, db } from '../../config/firebaseConfig';
 import { collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { usePoints, POINTS_PER_TASK } from '../../contexts/PointsContext';
 
+/**
+ * Task Interface
+ * 
+ * - defines structure for task objects stored in Firestore.
+ * - includes optional fields for due dates and completion tracking.
+ */
 interface Task {
   id: string;
   title: string;
@@ -27,6 +33,7 @@ export const TasksScreen = ({ navigation }: any) => {
   const theme = isDarkMode ? colors.dark : colors.light;
   const { addPoints, incrementTasksCompleted, dailyStreak } = usePoints();
 
+  // Task creation state.
   const [newTask, setNewTask] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('');
   const today = new Date();
@@ -36,11 +43,21 @@ export const TasksScreen = ({ navigation }: any) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   
+  /**
+   * Component Initialization Hook
+   * 
+   * - loads tasks and checks for any that need resetting when component mounts.
+   */
   useEffect(() => {
     loadTasks();
     checkAndResetTasks();
   }, []);
 
+  /**
+   * Check and Reset Tasks
+   * 
+   * - automatically resets completed recurring tasks based on their repeat type.
+   */
   const checkAndResetTasks = async () => {
     const user = auth.currentUser;
     if (!user) return;
@@ -55,20 +72,24 @@ export const TasksScreen = ({ navigation }: any) => {
       querySnapshot.forEach(async (taskDoc) => {
         const task = taskDoc.data() as Task;
         
+        // only check completed tasks with a completion date.
         if (task.completed && task.lastCompletedDate) {
           const lastCompleted = new Date(task.lastCompletedDate);
           const now = new Date();
 
           let shouldReset = false;
 
+          // daily tasks reset if completed on a different calendar day.
           if (task.repeatType === 'DAILY') {
             shouldReset = lastCompleted.toDateString() !== now.toDateString();
           } else if (task.repeatType === 'WEEKLY') {
+            // weekly tasks reset after 7 days.
             const daysDiff = Math.floor((now.getTime() - lastCompleted.getTime()) / (1000 * 60 * 60 * 24));
             shouldReset = daysDiff >= 7;
           }
 
           if (shouldReset) {
+            // reset task to incomplete and clear completion date.
             await updateDoc(doc(db, 'tasks', taskDoc.id), {
               completed: false,
               lastCompletedDate: null
@@ -77,12 +98,19 @@ export const TasksScreen = ({ navigation }: any) => {
         }
       });
 
+      // reload tasks to reflect any resets.
       await loadTasks();
     } catch (error) {
       console.log('Error checking task resets:', error);
     }
   };
 
+  /**
+   * Load Tasks
+   * 
+   * - retrieves all tasks for the current user from Firestore.
+   * - filters by userId to ensure data isolation between users.
+   */
   const loadTasks = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -106,7 +134,16 @@ export const TasksScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Create Task
+   * 
+   * - validates and creates a new task in Firestore.
+   * 
+   * - task title must not be empty.
+   * - user must be authenticated.
+   */
   const handleCreateTask = async () => {
+    // validate task title.
     if (!newTask.trim()) {
       Alert.alert('Error', 'Please enter a task title');
       return;
@@ -128,6 +165,7 @@ export const TasksScreen = ({ navigation }: any) => {
         icon: getIconForFilter(selectedFilter),
         userId: user.uid,
         createdAt: new Date().toISOString(),
+        // only set dueDate for CUSTOM tasks.
         dueDate: calendarView === 'CUSTOM' ? `${currentMonth.getFullYear()}-${currentMonth.getMonth() + 1}-${selectedDate}` : null,
         repeatType: calendarView,
         lastCompletedDate: null,
@@ -137,6 +175,7 @@ export const TasksScreen = ({ navigation }: any) => {
       
       await loadTasks();
       
+      // clear input fields after successful creation.
       setNewTask('');
       setSelectedFilter('');
       
@@ -149,24 +188,38 @@ export const TasksScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Toggle Task
+   * 
+   * - marks task as complete/incomplete and updates points accordingly.
+   * 
+   * - sets completed to true.
+   * - records completion timestamp.
+   * - awards points.
+   * - increments tasks completed counter.
+   */
   const toggleTask = async (taskId: string, task: Task) => {
     try {
       const taskRef = doc(db, 'tasks', taskId);
       const newCompletedStatus = !task.completed;
       
+      // update task in Firestore.
       await updateDoc(taskRef, {
         completed: newCompletedStatus,
         lastCompletedDate: newCompletedStatus ? new Date().toISOString() : null
       });
       
       if (newCompletedStatus) {
+        // award points on completion.
         const isDailyTask = task.repeatType === 'DAILY';
         await addPoints(POINTS_PER_TASK, isDailyTask);
         await incrementTasksCompleted();
       } else {
+        // deduct points for un-completing.
         await addPoints(-POINTS_PER_TASK, false);
       }
       
+      // update local state to reflect changes immediately.
       setTasks(tasks.map(t => 
         t.id === taskId ? { ...t, completed: newCompletedStatus, lastCompletedDate: newCompletedStatus ? new Date().toISOString() : undefined } : t
       ));
@@ -176,6 +229,12 @@ export const TasksScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Confirm Delete Task
+   * 
+   * - shows confirmation dialog before deleting a task.
+   * - displays task title in confirmation message.
+   */
   const confirmDeleteTask = (taskId: string, taskTitle: string) => {
     Alert.alert(
       'Delete Task',
@@ -194,6 +253,12 @@ export const TasksScreen = ({ navigation }: any) => {
     );
   };
 
+  /**
+   * Delete Task
+   * 
+   * - permanently removes task from Firestore.
+   * - reloads task list to reflect deletion.
+   */
   const deleteTask = async (taskId: string) => {
     try {
       await deleteDoc(doc(db, 'tasks', taskId));
@@ -204,6 +269,11 @@ export const TasksScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Get Icon for Filter
+   * 
+   * - maps category names to appropriate Ionicons icon names.
+   */
   const getIconForFilter = (filter: string) => {
     switch (filter) {
       case 'STUDY': return 'book';
@@ -213,6 +283,7 @@ export const TasksScreen = ({ navigation }: any) => {
     }
   };
 
+  // pre-defined task suggestions for quick adding.
   const suggestions = [
     { id: 1, title: 'Laundry', filter: 'TIDY UP' },
     { id: 2, title: 'Wash Bed Sheets', filter: 'TIDY UP' },
@@ -222,38 +293,61 @@ export const TasksScreen = ({ navigation }: any) => {
     { id: 6, title: 'Do 20 minute workout', filter: 'HEALTH' },
   ];
 
+  // available category filters.
   const filters = ['STUDY', 'HEALTH', 'TIDY UP'];
 
+  // month names for calendar display.
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
 
+  /**
+   * Get Days in Month
+   * 
+   * - generates array of day numbers for calendar grid.
+   * - includes null values for padding to align first day with correct weekday.
+   */
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
+    const firstDay = new Date(year, month, 1).getDay(); // 0 = Sunday, 6 = Saturday.
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     
     const days = [];
+    // add null padding for days before first of month.
     for (let i = 0; i < firstDay; i++) {
       days.push(null);
     }
+    // add actual day numbers.
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(i);
     }
     return days;
   };
 
+  /**
+   * Change Month
+   * 
+   * - navigates calendar forward or backward by one month.
+   * - direction -  -1 for previous month, +1 for next month.
+   */
   const changeMonth = (direction: number) => {
     const newDate = new Date(currentMonth);
     newDate.setMonth(newDate.getMonth() + direction);
     setCurrentMonth(newDate);
   };
 
+  /**
+   * Is Today
+   */
   const isToday = (day: number) => {
     const checkDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     return checkDate.toDateString() === today.toDateString();
   };
 
+  /**
+   * Is Selected
+   * 
+   */
   const isSelected = (day: number) => {
     return day === selectedDate && 
            currentMonth.getMonth() === today.getMonth() &&
@@ -263,8 +357,12 @@ export const TasksScreen = ({ navigation }: any) => {
   const days = getDaysInMonth(currentMonth);
   const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
+  // count incomplete tasks for display.
   const tasksRemaining = tasks.filter(t => !t.completed).length;
 
+  /**
+   * Format Date
+   */
   const formatDate = (dateString: string) => {
     const [year, month, day] = dateString.split('-');
     const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
@@ -272,6 +370,10 @@ export const TasksScreen = ({ navigation }: any) => {
     return `${monthName} ${day}, ${year}`;
   };
 
+  /**
+   * Get Repeat Text
+   * 
+   */
   const getRepeatText = (task: Task) => {
     if (task.repeatType === 'DAILY') {
       return 'Repeats daily';
@@ -283,6 +385,11 @@ export const TasksScreen = ({ navigation }: any) => {
     return 'One-time task';
   };
 
+  /**
+   * Add Suggestion
+   * 
+   * - quickly adds a pre-defined task suggestion to user's task list.
+   */
   const addSuggestion = async (suggestion: any) => {
     const user = auth.currentUser;
     if (!user) return;
@@ -306,7 +413,7 @@ export const TasksScreen = ({ navigation }: any) => {
     } catch (error) {
       Alert.alert('Error', 'Failed to add task');
     }
-  };
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>

@@ -9,6 +9,11 @@ import { usePoints } from '../../contexts/PointsContext';
 import { auth, db } from '../../config/firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
+/**
+ * Shop Item Interface
+ * 
+ * - defines structure for all purchasable items in the shop.
+ */
 interface ShopItem {
   id: string;
   name: string;
@@ -16,17 +21,28 @@ interface ShopItem {
   price: number;
   icon: string;
   category: 'pet' | 'theme' | 'powerup' | 'boost';
-  duration?: number; 
+  duration?: number;
 }
 
+/**
+ * User Inventory Interface
+ * 
+ * - stores user's purchased items and active boosts.
+ * - active boosts include expiration timestamps for time-limited items.
+ */
 interface UserInventory {
   ownedItems: string[];
   activeBoosts: {
     itemId: string;
-    expiresAt: string;
+    expiresAt: string; // ISO timestamp.
   }[];
 }
 
+/**
+ * Shop Items Catalog
+ * 
+ * - complete list of all available shop items with prices and categories - just template form currently.
+ */
 const SHOP_ITEMS: ShopItem[] = [
   {
     id: 'pet_hat',
@@ -60,6 +76,7 @@ const SHOP_ITEMS: ShopItem[] = [
     icon: 'trophy',
     category: 'pet',
   },
+
   {
     id: 'double_points',
     name: '2x Points Boost',
@@ -95,6 +112,7 @@ const SHOP_ITEMS: ShopItem[] = [
     icon: 'checkmark-done',
     category: 'powerup',
   },
+
   {
     id: 'theme_ocean',
     name: 'Ocean Theme',
@@ -119,6 +137,7 @@ const SHOP_ITEMS: ShopItem[] = [
     icon: 'leaf',
     category: 'theme',
   },
+
   {
     id: 'energy_drink',
     name: 'Energy Drink',
@@ -142,16 +161,27 @@ export const ShopScreen = ({ navigation }: any) => {
   const theme = isDarkMode ? colors.dark : colors.light;
   const { heartPoints, subtractPoints, refreshPoints } = usePoints();
 
+  // shop state management.
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'pet' | 'theme' | 'powerup' | 'boost'>('all');
   const [inventory, setInventory] = useState<UserInventory>({ ownedItems: [], activeBoosts: [] });
   const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  /**
+   * Component Initialisation Hook
+   * 
+   * - loads user inventory from Firestore when component mounts.
+   */
   useEffect(() => {
     loadInventory();
   }, []);
 
+  /**
+   * Load Inventory
+   * 
+   * - retrieves user's purchased items and active boosts from Firestore.
+   */
   const loadInventory = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -175,10 +205,12 @@ export const ShopScreen = ({ navigation }: any) => {
           activeBoosts: activeBoosts,
         });
 
+        // update Firestore if any boosts expired.
         if (activeBoosts.length !== data.activeBoosts?.length) {
           await updateDoc(inventoryRef, { activeBoosts });
         }
       } else {
+        // create initial inventory for new users.
         const initialInventory: UserInventory = {
           ownedItems: [],
           activeBoosts: [],
@@ -192,6 +224,15 @@ export const ShopScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Purchase
+   * 
+   * - checks user is logged in.
+   * - checks user has enough points.
+   * - checks item not already owned.
+   * 
+   * - updates both points balance and inventory in Firestore.
+   */
   const handlePurchase = async (item: ShopItem) => {
     const user = auth.currentUser;
     if (!user) {
@@ -199,11 +240,13 @@ export const ShopScreen = ({ navigation }: any) => {
       return;
     }
 
+    // check if user has enough points.
     if (heartPoints < item.price) {
       Alert.alert('Insufficient Points', `You need ${item.price - heartPoints} more points to purchase this item.`);
       return;
     }
 
+    // check if permanent item is already owned.
     if (item.category !== 'boost' && item.category !== 'powerup') {
       if (inventory.ownedItems.includes(item.id)) {
         Alert.alert('Already Owned', 'You already own this item!');
@@ -212,6 +255,7 @@ export const ShopScreen = ({ navigation }: any) => {
     }
 
     try {
+      // take points from users balance.
       const success = await subtractPoints(item.price);
       
       if (!success) {
@@ -221,7 +265,9 @@ export const ShopScreen = ({ navigation }: any) => {
 
       const inventoryRef = doc(db, 'userInventory', user.uid);
 
+      // handle time-limited power ups.
       if (item.category === 'powerup' && item.duration) {
+        // calculate expiration time.
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + item.duration);
 
@@ -232,6 +278,7 @@ export const ShopScreen = ({ navigation }: any) => {
 
         const updatedBoosts = [...inventory.activeBoosts, newBoost];
         
+        // update active boosts in Firestore.
         await updateDoc(inventoryRef, {
           activeBoosts: updatedBoosts,
         });
@@ -241,6 +288,7 @@ export const ShopScreen = ({ navigation }: any) => {
           activeBoosts: updatedBoosts,
         }));
       } else {
+        // handle permanent items.
         const updatedItems = [...inventory.ownedItems, item.id];
         
         await updateDoc(inventoryRef, {
@@ -252,9 +300,11 @@ export const ShopScreen = ({ navigation }: any) => {
           ownedItems: updatedItems,
         }));
       }
+      
+      // refresh points display to show updated balance.
       await refreshPoints();
 
-      Alert.alert('Purchase Successful! 🎉', `You bought ${item.name}!`);
+      Alert.alert('Purchase Successful!', `You bought ${item.name}!`);
       setShowPurchaseModal(false);
       setSelectedItem(null);
     } catch (error) {
@@ -263,6 +313,11 @@ export const ShopScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Get Icon Color
+   * 
+   * - returns appropriate icon color based on theme.
+   */
   const getIconColor = (isDark: boolean) => {
     return isDark ? '#888' : '#666';
   };
@@ -271,14 +326,29 @@ export const ShopScreen = ({ navigation }: any) => {
     ? SHOP_ITEMS 
     : SHOP_ITEMS.filter(item => item.category === selectedCategory);
 
+  /**
+   * Is Item Owned
+   * 
+   * - checks if user owns a permanent item.
+   */
   const isItemOwned = (itemId: string) => {
     return inventory.ownedItems.includes(itemId);
   };
 
+  /**
+   * Is Boost Active
+   * 
+   * - checks if a time-limited boost is currently active.
+   */
   const isBoostActive = (itemId: string) => {
     return inventory.activeBoosts.some(boost => boost.itemId === itemId);
   };
 
+  /**
+   * Get Boost Time Remaining
+   * 
+   * - calculates hours remaining for an active boost.
+   */
   const getBoostTimeRemaining = (itemId: string): string => {
     const boost = inventory.activeBoosts.find(b => b.itemId === itemId);
     if (!boost) return '';
@@ -290,6 +360,7 @@ export const ShopScreen = ({ navigation }: any) => {
     return `${hoursLeft}h left`;
   };
 
+  // category tabs for filtering.
   const categories = [
     { id: 'all', name: 'All', icon: 'apps' },
     { id: 'pet', name: 'Pet', icon: 'paw' },
@@ -298,6 +369,7 @@ export const ShopScreen = ({ navigation }: any) => {
     { id: 'boost', name: 'Boosts', icon: 'rocket' },
   ];
 
+  // show loading indicator while fetching inventory.
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -308,6 +380,7 @@ export const ShopScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* heart points display. */}
       <View style={styles.pointsContainer}>
         <View style={[styles.pointsBox, {
           backgroundColor: isDarkMode ? '#2a2a2a' : '#e8e8e8',
@@ -323,6 +396,7 @@ export const ShopScreen = ({ navigation }: any) => {
         </View>
       </View>
 
+      {/* back navigation button. */}
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => navigation.goBack()}
@@ -330,6 +404,7 @@ export const ShopScreen = ({ navigation }: any) => {
         <Ionicons name="arrow-back" size={28} color={theme.text} />
       </TouchableOpacity>
 
+      {/* theme toggle button. */}
       <View style={styles.themeToggleContainer}>
         <ThemeToggle />
       </View>
@@ -382,6 +457,7 @@ export const ShopScreen = ({ navigation }: any) => {
           ))}
         </ScrollView>
 
+        {/* active boosts banner. */}
         {inventory.activeBoosts.length > 0 && (
           <View style={[styles.activeBoostsBanner, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -393,6 +469,7 @@ export const ShopScreen = ({ navigation }: any) => {
           </View>
         )}
 
+        {/* shop items grid. */}
         <View style={styles.itemsGrid}>
           {filteredItems.map((item) => {
             const owned = isItemOwned(item.id);
@@ -411,20 +488,25 @@ export const ShopScreen = ({ navigation }: any) => {
                   setShowPurchaseModal(true);
                 }}
               >
+                {/* item icon. */}
                 <View style={[styles.itemIconContainer, { 
                   backgroundColor: isDarkMode ? '#3a3a3a' : '#e0e0e0',
                 }]}>
                   <Ionicons name={item.icon as any} size={40} color={getIconColor(isDarkMode)} />
                 </View>
 
+                {/* item name. */}
                 <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
                   {item.name}
                 </Text>
+                {/* item description. */}
                 <Text style={[styles.itemDescription, { color: isDarkMode ? '#888' : '#666' }]} numberOfLines={2}>
                   {item.description}
                 </Text>
 
+                {/* item footer with price or status badges. */}
                 <View style={styles.itemFooter}>
+                  {/* show "owned" badge for permanent items already purchased. */}
                   {owned && item.category !== 'boost' && item.category !== 'powerup' ? (
                     <View style={styles.ownedBadge}>
                       <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
@@ -454,6 +536,7 @@ export const ShopScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
+      {/* purchase confirmation modal. */}
       <Modal
         visible={showPurchaseModal}
         transparent
@@ -472,10 +555,12 @@ export const ShopScreen = ({ navigation }: any) => {
                   <Ionicons name={selectedItem.icon as any} size={60} color={getIconColor(isDarkMode)} />
                 </View>
 
+                {/* item name. */}
                 <Text style={[styles.modalTitle, { color: theme.text }]}>
                   {selectedItem.name}
                 </Text>
 
+                {/* item desc. */}
                 <Text style={[styles.modalDescription, { color: isDarkMode ? '#888' : '#666' }]}>
                   {selectedItem.description}
                 </Text>
@@ -486,6 +571,7 @@ export const ShopScreen = ({ navigation }: any) => {
                   </Text>
                 )}
 
+                {/* price display. */}
                 <View style={[styles.modalPrice, {
                   backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
                 }]}>
@@ -510,6 +596,7 @@ export const ShopScreen = ({ navigation }: any) => {
                     </Text>
                   </TouchableOpacity>
 
+                  {/* purchase button - changes color and text based on affordability. */}
                   <TouchableOpacity
                     style={[styles.modalButton, styles.purchaseButton, {
                       backgroundColor: heartPoints >= selectedItem.price ? '#4CAF50' : '#ff4444',

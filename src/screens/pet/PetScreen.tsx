@@ -19,7 +19,7 @@ export const PetScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
 
   /**
-   * Component Initialization Hook
+   * Component Initialisation Hook
    * 
    * - loads lifetime points from Firestore on component mount.
    */

@@ -12,15 +12,26 @@ export const SettingsScreen = ({ navigation }: any) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? colors.dark : colors.light;
 
+  // settings state.
   const [notifications, setNotifications] = useState(true);
   const [taskReminders, setTaskReminders] = useState(true);
   const [autoSync, setAutoSync] = useState(true);
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Component Initialisation Hook
+   * 
+   * - loads user settings from Firestore when component mounts.
+   */
   useEffect(() => {
     loadSettings();
   }, []);
 
+  /**
+   * Load Settings
+   * 
+   * - retrieves user preferences from Firestore.
+   */
   const loadSettings = async () => {
     const user = auth.currentUser;
     if (!user) return;
@@ -31,6 +42,7 @@ export const SettingsScreen = ({ navigation }: any) => {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
+        // default to true if field doesn't exist or is undefined.
         setNotifications(data.notifications !== false);
         setTaskReminders(data.taskReminders !== false);
         setAutoSync(data.autoSync !== false);
@@ -40,6 +52,11 @@ export const SettingsScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Notifications Toggle
+   * 
+   * - updates push notification preference in Firestore.
+   */
   const handleNotificationsToggle = async (value: boolean) => {
     setNotifications(value);
     
@@ -54,6 +71,11 @@ export const SettingsScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Task Reminders Toggle
+   * 
+   * - updates task reminder preference in Firestore.
+   */
   const handleTaskRemindersToggle = async (value: boolean) => {
     setTaskReminders(value);
     
@@ -68,6 +90,11 @@ export const SettingsScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Auto-Sync Toggle
+   * 
+   * - updates auto-sync preference in Firestore.
+   */
   const handleAutoSyncToggle = async (value: boolean) => {
     setAutoSync(value);
     
@@ -82,6 +109,12 @@ export const SettingsScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Handle Export Data
+   * 
+   * - exports all user data including tasks, nutrition, fitness stats, and profile.
+   * - currently logs data to console - in production would download as JSON file probably.
+   */
   const handleExportData = async () => {
     Alert.alert(
       'Export Data',
@@ -96,12 +129,13 @@ export const SettingsScreen = ({ navigation }: any) => {
               const user = auth.currentUser;
               if (!user) return;
 
-              // Collect all user data
+              // collect all user data from different Firestore collections.
               const userData = await getDoc(doc(db, 'users', user.uid));
               const tasksSnapshot = await getDocs(query(collection(db, 'tasks'), where('userId', '==', user.uid)));
               const nutritionData = await getDoc(doc(db, 'nutritionData', user.uid));
               const fitnessData = await getDoc(doc(db, 'fitnessStats', user.uid));
 
+              // compile all data into single export object.
               const exportData = {
                 user: userData.data(),
                 tasks: tasksSnapshot.docs.map(d => d.data()),
@@ -124,6 +158,13 @@ export const SettingsScreen = ({ navigation }: any) => {
     );
   };
 
+  /**
+   * Handle Clear All Data
+   * 
+   * - permanently deletes all user data but account details.
+   * - removes -  tasks, nutrition data, fitness stats, and resets all points.
+   * - shows confirmation dialog with warning before deletion.
+   */
   const handleClearAllData = () => {
     Alert.alert(
       'Clear All Data',
@@ -139,27 +180,27 @@ export const SettingsScreen = ({ navigation }: any) => {
               const user = auth.currentUser;
               if (!user) return;
 
-              // Delete all tasks
+              // delete all user's tasks from Firestore.
               const tasksSnapshot = await getDocs(query(collection(db, 'tasks'), where('userId', '==', user.uid)));
               for (const taskDoc of tasksSnapshot.docs) {
                 await deleteDoc(doc(db, 'tasks', taskDoc.id));
               }
 
-              // Delete nutrition data
+              // delete nutrition data.
               try {
                 await deleteDoc(doc(db, 'nutritionData', user.uid));
               } catch (e) {
                 console.log('No nutrition data to delete');
               }
 
-              // Delete fitness data
+              // delete fitness data.
               try {
                 await deleteDoc(doc(db, 'fitnessStats', user.uid));
               } catch (e) {
                 console.log('No fitness data to delete');
               }
 
-              // Reset user points
+              // reset all user points and statistics to zero.
               const userRef = doc(db, 'users', user.uid);
               await updateDoc(userRef, {
                 score: 0,
@@ -185,6 +226,7 @@ export const SettingsScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* back navigation button. */}
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => navigation.goBack()}
@@ -196,6 +238,7 @@ export const SettingsScreen = ({ navigation }: any) => {
         />
       </TouchableOpacity>
 
+      {/* theme toggle button. */}
       <View style={styles.themeToggleContainer}>
         <ThemeToggle />
       </View>
@@ -205,10 +248,12 @@ export const SettingsScreen = ({ navigation }: any) => {
           SETTINGS
         </Text>
 
+        {/* account section. */}
         <Text style={[styles.sectionTitle, { color: isDarkMode ? '#888' : '#666' }]}>
           ACCOUNT
         </Text>
 
+        {/* profile navigation item. */}
         <TouchableOpacity 
           style={[styles.settingItem, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -232,10 +277,12 @@ export const SettingsScreen = ({ navigation }: any) => {
           />
         </TouchableOpacity>
 
+        {/* notifications section. */}
         <Text style={[styles.sectionTitle, { color: isDarkMode ? '#888' : '#666' }]}>
           NOTIFICATIONS
         </Text>
 
+        {/* push notifications toggle. */}
         <View 
           style={[styles.settingItem, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -260,6 +307,7 @@ export const SettingsScreen = ({ navigation }: any) => {
           />
         </View>
 
+        {/* task reminders toggle. */}
         <View 
           style={[styles.settingItem, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -288,6 +336,7 @@ export const SettingsScreen = ({ navigation }: any) => {
           PREFERENCES
         </Text>
 
+        {/* language selection - currently placeholder :( */}
         <TouchableOpacity 
           style={[styles.settingItem, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -368,6 +417,7 @@ export const SettingsScreen = ({ navigation }: any) => {
           />
         </TouchableOpacity>
 
+        {/* clear all data button. */}
         <TouchableOpacity 
           style={[styles.settingItem, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
@@ -397,6 +447,7 @@ export const SettingsScreen = ({ navigation }: any) => {
           ABOUT
         </Text>
 
+        {/* app version display.*/}
         <TouchableOpacity 
           style={[styles.settingItem, {
             backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',

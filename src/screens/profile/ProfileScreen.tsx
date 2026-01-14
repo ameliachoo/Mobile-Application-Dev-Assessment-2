@@ -26,7 +26,7 @@ export const ProfileScreen = ({ navigation }: any) => {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   /**
-   * Component Initialization Hook
+   * Component Initialisation Hook
    * 
    * - fetches user data from Firestore when component mounts.
    */
