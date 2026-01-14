@@ -5,9 +5,9 @@ import { getFirestore } from 'firebase/firestore';
 /**
  * Firebase Configuration
  * 
- * Initializes Firebase services for the app.
- * Provides authentication and Firestore database functionality.
- * Configuration values are loaded from environment variables.
+ * initializes Firebase services for the app.
+ * provides authentication and Firestore database functionality.
+ * its all private with a .env file so I don't accidentally upload my keys to Github...
  */
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,

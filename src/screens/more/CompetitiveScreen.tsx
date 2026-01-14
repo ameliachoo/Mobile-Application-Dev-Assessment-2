@@ -8,6 +8,11 @@ import { ThemeToggle } from '../../components/common/ThemeToggle';
 import { collection, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebaseConfig';
 
+/**
+ * Leaderboard User Data Struct
+ * 
+ * - represents a user's position and score on the global leaderboard.
+ */
 interface LeaderboardUser {
   uid: string;
   username: string;
@@ -15,18 +20,40 @@ interface LeaderboardUser {
   position?: number;
 }
 
+/**
+ * CompetitiveScreen Component.
+ * 
+ * - displays global leaderboard with top users ranked by score.
+ * - features a podium display for top 3 users and a scrollable list for all ranked users.
+ * - highlights current user's position and score.
+ * 
+ * - top 3 podium display with trophy icon for 1st place.
+ * - scrollable leaderboard showing up to 50 top users.
+ * - current user card with position and score.
+ */
 export const CompetitiveScreen = ({ navigation }: any) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? colors.dark : colors.light;
 
+  // state management
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
   const [currentUserData, setCurrentUserData] = useState<LeaderboardUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+    /**
+   * Fetch Data 
+   * 
+   * - loads both leaderboard and current user data.
+   */
   useEffect(() => {
     fetchData();
   }, []);
 
+    /**
+   * Fetch Data 
+   * 
+   * - runs leaderboard and current user queries in parallel.
+   */
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -42,6 +69,12 @@ export const CompetitiveScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Fetch Leaderboard Data
+   * 
+   * - retrieves top 50 users sorted by score in descending order.
+   * - assigns positions (1-50) to each user based on their rank.
+   */
   const fetchLeaderboard = async () => {
     try {
       const leaderboardQuery = query(
@@ -62,7 +95,7 @@ export const CompetitiveScreen = ({ navigation }: any) => {
         });
       });
 
-      // Add position numbers
+      // add position number based on rank. 
       const rankedUsers = users.map((user, index) => ({
         ...user,
         position: index + 1
@@ -74,6 +107,11 @@ export const CompetitiveScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Fetch Current User's Data
+   * 
+   * - retrieves username and score from Firestore 'users' collection.
+   */
   const fetchCurrentUser = async () => {
     try {
       const user = auth.currentUser;
@@ -93,10 +131,20 @@ export const CompetitiveScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Render Podium Display
+   *
+   * - 1st place: center position, tallest platform, trophy icon.
+   * - 2nd place: left position, medium platform.
+   * - 3rd place: right position, shortest platform.
+   * 
+   * - highlights current user with blue background if they're in top 3.
+   */
   const renderPodium = () => {
     if (leaderboard.length === 0) return null;
 
     const topThree = leaderboard.slice(0, 3);
+    // arange visual podium layout to be standard
     const positions = [
       topThree[1] || null, // 2nd place
       topThree[0] || null, // 1st place
@@ -112,6 +160,7 @@ export const CompetitiveScreen = ({ navigation }: any) => {
 
           return (
             <View key={index} style={styles.podiumItem}>
+              {/* trophy icon for 1st place. */}
               {actualPosition === 1 && (
                 <Ionicons 
                   name="trophy" 
@@ -120,6 +169,7 @@ export const CompetitiveScreen = ({ navigation }: any) => {
                   style={styles.crownIcon}
                 />
               )}
+              {/* user avatar circle. */}
               <View style={[styles.podiumAvatar, {
                 backgroundColor: isCurrentUser 
                   ? '#4A90E2'
@@ -132,6 +182,7 @@ export const CompetitiveScreen = ({ navigation }: any) => {
                   color={isCurrentUser ? '#fff' : isDarkMode ? '#666' : '#999'} 
                 />
               </View>
+              {/* username below avatar. */}
               {user && (
                 <Text style={[styles.podiumUsername, { 
                   color: theme.text,
@@ -140,6 +191,7 @@ export const CompetitiveScreen = ({ navigation }: any) => {
                   {user.username}
                 </Text>
               )}
+              {/* podium platform with position number. */}
               <View style={[styles.podiumPlatform, {
                 backgroundColor: isDarkMode ? '#3a3a3a' : '#d0d0d0',
                 height,
@@ -155,6 +207,7 @@ export const CompetitiveScreen = ({ navigation }: any) => {
     );
   };
 
+  // loading state display.
   if (loading) {
     return (
       <View style={[styles.container, { 
@@ -169,6 +222,7 @@ export const CompetitiveScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* back nav button. */}
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => navigation.goBack()}
@@ -180,6 +234,7 @@ export const CompetitiveScreen = ({ navigation }: any) => {
         />
       </TouchableOpacity>
 
+      {/* theme toggle button. */}
       <View style={styles.themeToggleContainer}>
         <ThemeToggle />
       </View>
@@ -189,18 +244,18 @@ export const CompetitiveScreen = ({ navigation }: any) => {
           GLOBAL LEADERBOARD
         </Text>
 
-        {/* Podium */}
+        {/* top 3 podium display. */}
         {renderPodium()}
 
-        {/* Progress Bar */}
+        {/* visual separator. */}
         <View style={[styles.progressBar, {
           backgroundColor: isDarkMode ? '#3a3a3a' : '#d0d0d0',
         }]} />
 
-        {/* Current User Card */}
+        {/* current user highlighted card. */}
         {currentUserData && (
           <View style={[styles.currentUserCard, {
-            backgroundColor: '#4A90E2',
+            backgroundColor: '#4ab2e2ff',
           }]}>
             <View style={styles.leaderboardLeft}>
               <View style={[styles.positionCircle, {
@@ -222,7 +277,7 @@ export const CompetitiveScreen = ({ navigation }: any) => {
           </View>
         )}
 
-        {/* Leaderboard List */}
+        {/* full leaderboard list */}
         <View style={styles.leaderboardList}>
           {leaderboard.length === 0 ? (
             <Text style={[styles.emptyText, { color: isDarkMode ? '#888' : '#666' }]}>
@@ -240,13 +295,13 @@ export const CompetitiveScreen = ({ navigation }: any) => {
                       ? 'rgba(74, 144, 226, 0.2)'
                       : isDarkMode ? '#2a2a2a' : '#f5f5f5',
                     borderWidth: isCurrentUser ? 2 : 0,
-                    borderColor: '#4A90E2',
+                    borderColor: '#4ab2e2ff',
                   }]}
                 >
                   <View style={styles.leaderboardLeft}>
                     <View style={[styles.positionCircle, {
                       backgroundColor: isCurrentUser
-                        ? '#4A90E2'
+                        ? '#4ab2e2ff'
                         : isDarkMode ? '#3a3a3a' : '#e0e0e0',
                     }]}>
                       <Text style={[styles.positionText, { 
@@ -272,11 +327,13 @@ export const CompetitiveScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
       
+      {/* status bar. */}
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
     </View>
   );
 };
 
+// style sheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,

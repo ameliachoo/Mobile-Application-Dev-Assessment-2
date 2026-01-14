@@ -5,23 +5,42 @@ import { colors } from '../../styles/colors/Colors';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../config/firebaseConfig';
 
+/**
+ * LoginScreen Component
+ * 
+ * - authentication screen for existing users to sign in to their accounts.
+ * - handles email/password authentication via Firebase and provides navigation to signup and password recovery screens.
+ * 
+ * - email and password authentication.
+ * - realtime error handling with easy to read messages.
+ * - loading states during authentication
+ * - nav to signup and forgot password screens
+ */
 export const LoginScreen = ({ navigation }: any) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? colors.dark : colors.light;
   
+  // form state management
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  /**
+   * Handle User Login
+   * 
+   * validates form inputs and authenticates user with Firebase.
+   * provides specific error messages for common authentication failures.
+   * navigation to main app occurs automatically via auth state listener.
+   */
   const handleLogin = async () => {
+    // clear any previous error messages.
     setErrorMessage('');
-    
+    // validate that the fields are filled in.
     if (!email || !password) {
       setErrorMessage('Please fill in all fields');
       return;
     }
-
     setLoading(true);
 
     try {
@@ -37,9 +56,10 @@ export const LoginScreen = ({ navigation }: any) => {
       
     } catch (error: any) {
       console.log('Login error:', error.code);
-      
+      // default error message
       let errorMsg = 'Failed to log in. Please try again.';
       
+      // user friendly error messages.
       switch (error.code) {
         case 'auth/invalid-credential':
           errorMsg = 'Invalid email or password.';
@@ -57,7 +77,7 @@ export const LoginScreen = ({ navigation }: any) => {
           errorMsg = 'Network error. Check your connection.';
           break;
         case 'auth/too-many-requests':
-          errorMsg = 'Too many attempts. Try again later';
+          errorMsg = 'Too many attempts. Try again later.';
           break;
       }
       
@@ -67,10 +87,16 @@ export const LoginScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * navigate to signUp Screen.
+   */
   const handleSignUp = () => {
     navigation.navigate('SignUp');
   };
 
+/**
+* navigate to forgotPassword screen.
+*/
 const handleForgotPassword = () => {
   navigation.navigate('ForgotPassword');
 };
@@ -82,6 +108,7 @@ const handleForgotPassword = () => {
           Sign into your account
         </Text>
 
+        {/* error message display. */}
         {errorMessage ? (
           <View style={[styles.errorContainer, { 
             backgroundColor: isDarkMode ? '#ff4444' : '#ffebee',
@@ -94,6 +121,7 @@ const handleForgotPassword = () => {
           </View>
         ) : null}
         
+        {/* email input field - disabled during loading. */}
         <TextInput
           style={[styles.input, { 
             backgroundColor: theme.inputBackground,
@@ -108,6 +136,7 @@ const handleForgotPassword = () => {
           editable={!loading}
         />
         
+        {/* password input field - disabled during loading. */}
         <TextInput
           style={[styles.input, { 
             backgroundColor: theme.inputBackground,
@@ -121,7 +150,8 @@ const handleForgotPassword = () => {
           autoCapitalize="none"
           editable={!loading}
         />
-        
+
+        {/* forgot password link */}
         <TouchableOpacity 
           style={styles.forgotButton}
           onPress={handleForgotPassword}
@@ -132,6 +162,7 @@ const handleForgotPassword = () => {
           </Text>
         </TouchableOpacity>
         
+        {/* login button - shows loading spinner when active. */}
         <TouchableOpacity 
           style={[
             styles.button, 
@@ -154,6 +185,7 @@ const handleForgotPassword = () => {
           Don't have an account? <Text style={styles.signupTextBold}>Sign up</Text>
         </Text>
         
+        {/* sign up navigation button. */}
         <TouchableOpacity 
           style={[styles.signupButton, { 
             backgroundColor: theme.buttonSecondary,
@@ -171,6 +203,7 @@ const handleForgotPassword = () => {
   );
 };
 
+// style sheet
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,

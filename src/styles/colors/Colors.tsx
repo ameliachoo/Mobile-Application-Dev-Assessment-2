@@ -1,3 +1,4 @@
+// colours! but spelt american
 export const colors = {
   light: {
     background: '#fff',

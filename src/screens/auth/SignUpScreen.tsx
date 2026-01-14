@@ -6,64 +6,94 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebaseConfig';
 
+/**
+ * SignUpScreen Component
+ * 
+ * - user registration screen for creating new accounts.
+ * - handles email/password authentication via Firebase and creates user profile in Firestore.
+ * 
+ * - register email and password with confirmation
+ * - username collection for the profile for the competitive screen
+ * - input validation
+ * - authentication using Firebase
+ * - account creation using Firestore
+ * - more friendly error messages
+ */
 export const SignUpScreen = ({ navigation }: any) => {
   const { isDarkMode } = useTheme();
   const theme = isDarkMode ? colors.dark : colors.light;
   
+  // form state management. 
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Handle User Registration
+   * 
+   * - validates all form inputs and creates a new user account in Firebase.
+   * - after successful auth, create a user profile doc in Firestore.
+   * 
+   * - checks all fields are filled
+   * - checks passwords match to accounts
+   * - checks minimum password length
+   * - ensures valid email format 
+   */
   const handleSignUp = async () => {
+    // validates all fields are filled.
     if (!email || !username || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Error', 'Please fill in all fields.');
       return;
     }
 
+    // checks that passwords match.
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match!');
       return;
     }
 
+    // checks password strength (length).
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert('Error', 'Password must be at least 6 characters.');
       return;
     }
 
+    // checks email formatting using regex
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      Alert.alert('Error', 'Please enter a valid email address.');
       return;
     }
 
     setLoading(true);
 
     try {
+      // create firebase auth account
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
-
       const user = userCredential.user;
 
+      // creates a user profile doc in Firestore 
       await setDoc(doc(db, 'users', user.uid), {
         username: username,
         email: email,
         createdAt: new Date().toISOString(),
       });
-
       console.log('User created successfully:', user.uid);
       
       Alert.alert('Success', 'Account created successfully!');
 
+      // default error message
     } catch (error: any) {
       console.error('Sign up error:', error);
-      
       let errorMessage = 'Failed to create account. Please try again.';
-      
+
+      // user friendly error messages
       switch (error.code) {
         case 'auth/email-already-in-use':
           errorMessage = 'This email is already registered. Please login or use a different email.';
@@ -88,6 +118,9 @@ export const SignUpScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * navigate back to Login Screen
+   */
   const handleBackToLogin = () => {
     navigation.navigate('Login');
   };
@@ -99,6 +132,7 @@ export const SignUpScreen = ({ navigation }: any) => {
           Create your account
         </Text>
         
+        {/* email input field. */}
         <TextInput
           style={[styles.input, { 
             backgroundColor: theme.inputBackground,
@@ -113,6 +147,7 @@ export const SignUpScreen = ({ navigation }: any) => {
           editable={!loading}
         />
         
+        {/* username input field. */}
         <TextInput
           style={[styles.input, { 
             backgroundColor: theme.inputBackground,
@@ -126,6 +161,7 @@ export const SignUpScreen = ({ navigation }: any) => {
           editable={!loading}
         />
         
+        {/* password input field. */}
         <TextInput
           style={[styles.input, { 
             backgroundColor: theme.inputBackground,
@@ -140,6 +176,7 @@ export const SignUpScreen = ({ navigation }: any) => {
           editable={!loading}
         />
         
+        {/* confirm password input field. */}
         <TextInput
           style={[styles.input, { 
             backgroundColor: theme.inputBackground,
@@ -154,6 +191,7 @@ export const SignUpScreen = ({ navigation }: any) => {
           editable={!loading}
         />
         
+        {/* sign up button. */}
         <TouchableOpacity 
           style={[
             styles.button, 
@@ -176,6 +214,7 @@ export const SignUpScreen = ({ navigation }: any) => {
           Already have an account? <Text style={styles.loginTextBold}>Login</Text>
         </Text>
         
+        {/* back to login navigation button. */}
         <TouchableOpacity 
           style={[styles.loginButton, { 
             backgroundColor: theme.buttonSecondary,
@@ -193,6 +232,7 @@ export const SignUpScreen = ({ navigation }: any) => {
   );
 };
 
+// styles sheet
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
