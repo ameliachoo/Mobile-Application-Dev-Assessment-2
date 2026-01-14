@@ -653,6 +653,7 @@ export const TasksScreen = ({ navigation }: any) => {
   );
 };
 
+// style sheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,

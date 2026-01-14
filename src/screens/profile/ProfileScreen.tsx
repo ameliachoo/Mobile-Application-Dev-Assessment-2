@@ -370,6 +370,7 @@ export const ProfileScreen = ({ navigation }: any) => {
   );
 };
 
+// style sheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,

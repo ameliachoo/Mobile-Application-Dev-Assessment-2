@@ -532,6 +532,7 @@ export const ShopScreen = ({ navigation }: any) => {
   );
 };
 
+// style sheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -10,6 +10,7 @@ import { auth, db } from '../../config/firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { useFocusEffect } from '@react-navigation/native';
 
+
 interface NutritionData {
   waterGlasses: number;
   vegetables: number;
@@ -763,6 +764,7 @@ export const HealthScreen = ({ navigation }: any) => {
   );
 };
 
+// style sheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,

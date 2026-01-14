@@ -189,6 +189,7 @@ export const PetScreen = ({ navigation }: any) => {
   );
 };
 
+// style sheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,

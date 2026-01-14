@@ -5,18 +5,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { colors } from '../../styles/colors/Colors';
 import { ThemeToggle } from '../../components/common/ThemeToggle';
-import { Pedometer } from 'expo-sensors';
+import { Pedometer } from 'expo-sensors'; // Access device accelerometer for step counting
 import { usePoints } from '../../contexts/PointsContext';
 import { auth, db } from '../../config/firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
+/**
+ * Fitness Stats Interface
+ * 
+ * - stores daily step tracking data in Firestore.
+ * - lastReset is used to detect midnight boundaries for daily resets.
+ */
 interface FitnessStats {
   steps: number;
   stepGoal: number;
-  lastReset: string;
+  lastReset: string; // ISO timestamp for detecting midnight resets
   totalStepsAllTime: number;
 }
 
+/**
+ * Fitness Task Interface
+ * 
+ * - represents step-based achievements with completion tracking.
+ * - used for predefined milestones.
+ */
 interface FitnessTask {
   id: string;
   title: string;
@@ -30,12 +42,14 @@ export const FitnessScreen = ({ navigation }: any) => {
   const theme = isDarkMode ? colors.dark : colors.light;
   const { addPoints, incrementTasksCompleted, heartPoints } = usePoints();
 
+  // step tracking state.
   const [isPedometerAvailable, setIsPedometerAvailable] = useState(false);
   const [currentSteps, setCurrentSteps] = useState(0);
   const [stepGoal, setStepGoal] = useState(10000);
   const [totalStepsAllTime, setTotalStepsAllTime] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  // milestone achievements.
   const [fitnessTasks, setFitnessTasks] = useState<FitnessTask[]>([
     { id: '1', title: 'Take 1,000 steps', targetSteps: 1000, completed: false, icon: 'walk' },
     { id: '2', title: 'Take 5,000 steps', targetSteps: 5000, completed: false, icon: 'fitness' },
@@ -43,17 +57,30 @@ export const FitnessScreen = ({ navigation }: any) => {
     { id: '4', title: 'Power walker: 15,000 steps', targetSteps: 15000, completed: false, icon: 'rocket' },
   ]);
 
+  /**
+   * Component Initialisation Hook
+   * 
+   * - check pedometer availability.
+   * - load saved fitness stats from Firestore.
+   * - start polling for step updates every 10 seconds
+   * - fetch today's initial step count
+   */
   useEffect(() => {
     checkPedometerAvailability();
     loadFitnessStats();
     
     const subscription = subscribeToPedometer();
-    
     getTodaySteps();
     
     return subscription;
   }, []);
 
+  /**
+   * Check Pedometer Availability
+   * 
+   * - verifies if the device supports step counting through acelerometer.
+   * - displays alert if pedometer is unavailable.
+   */
   const checkPedometerAvailability = async () => {
     const available = await Pedometer.isAvailableAsync();
     setIsPedometerAvailable(available);
@@ -63,6 +90,14 @@ export const FitnessScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Load Fitness Statistics
+   * 
+   * - retrieves user's fitness data from Firestore and handles daily resset logic.
+   * - compares lastReset timestamp with current date to determine if it is a new day.
+   * - if new day detected, resets daily steps to 0.
+   * - creates initial stats document for first time users.
+   */
   const loadFitnessStats = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -77,22 +112,26 @@ export const FitnessScreen = ({ navigation }: any) => {
       if (docSnap.exists()) {
         const data = docSnap.data() as FitnessStats;
         
+        // check if it's a new day.
         const today = new Date().toDateString();
         const lastReset = new Date(data.lastReset).toDateString();
 
         if (today !== lastReset) {
+          // new day detected - reset daily steps.
           setCurrentSteps(0);
           await updateDoc(fitnessRef, {
             steps: 0,
             lastReset: new Date().toISOString(),
           });
         } else {
+          // same day - load existing steps.
           setCurrentSteps(data.steps);
         }
 
         setStepGoal(data.stepGoal || 10000);
         setTotalStepsAllTime(data.totalStepsAllTime || 0);
       } else {
+        // first time user - create initial stats document.
         const initialStats: FitnessStats = {
           steps: 0,
           stepGoal: 10000,
@@ -108,17 +147,24 @@ export const FitnessScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Get Today's Steps
+   * 
+   * - fetches step count from midnight to current time using Pedometer API.
+   */
   const getTodaySteps = async () => {
     try {
       const end = new Date();
       const start = new Date();
       start.setHours(0, 0, 0, 0);
 
+      // get step count from midnight to now.
       const result = await Pedometer.getStepCountAsync(start, end);
       
       if (result) {
         const todaySteps = result.steps;
         
+        // calculate increment for all-time total.
         const stepIncrease = todaySteps - currentSteps;
         if (stepIncrease > 0) {
           setTotalStepsAllTime(prev => prev + stepIncrease);
@@ -126,6 +172,7 @@ export const FitnessScreen = ({ navigation }: any) => {
         
         setCurrentSteps(todaySteps);
         
+        // persist to Firestore.
         const user = auth.currentUser;
         if (user) {
           const fitnessRef = doc(db, 'fitnessStats', user.uid);
@@ -140,16 +187,28 @@ export const FitnessScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Subscribe to Pedometer Updates
+   * 
+   * - sets up interval polling to check for step updates.
+   * - 10-second interval balances responsiveness with battery concerns.
+   */
   const subscribeToPedometer = () => {
     const interval = setInterval(() => {
       getTodaySteps();
-    }, 10000);
+    }, 10000); 
 
     return () => {
       clearInterval(interval);
     };
   };
 
+  /**
+   * Update Steps
+   * 
+   * - manually updates step count and syncs to Firestore.
+   * - not being used atm
+   */
   const updateSteps = async (totalSteps: number) => {
     const user = auth.currentUser;
     if (!user) return;
@@ -174,16 +233,24 @@ export const FitnessScreen = ({ navigation }: any) => {
     }
   };
 
+  /**
+   * Check Fitness Task Completion
+   * 
+   * - uses regex to extract step numbers from task titles for threshold comparison.
+   * - displays alert notifications when tasks are completed.
+   */
   const checkFitnessTaskCompletion = async (steps: number) => {
     const user = auth.currentUser;
     if (!user) return;
 
+    // check predefined fitness milestones.
     fitnessTasks.forEach(async (task) => {
       if (!task.completed && steps >= task.targetSteps) {
         setFitnessTasks(prev => 
           prev.map(t => t.id === task.id ? { ...t, completed: true } : t)
         );
 
+        // award points for achievement.
         await addPoints(50, false); 
         await incrementTasksCompleted();
 
@@ -191,6 +258,7 @@ export const FitnessScreen = ({ navigation }: any) => {
       }
     });
 
+    // check users custom tasks for step-related goals.
     try {
       const tasksRef = collection(db, 'tasks');
       const q = query(
@@ -203,6 +271,7 @@ export const FitnessScreen = ({ navigation }: any) => {
       querySnapshot.forEach(async (taskDoc) => {
         const task = taskDoc.data();
         
+        // check if task mentions steps and extract target number.
         if (!task.completed && task.title.toLowerCase().includes('step')) {
           const stepMatch = task.title.match(/\d+/);
           if (stepMatch && steps >= parseInt(stepMatch[0])) {
@@ -220,8 +289,12 @@ export const FitnessScreen = ({ navigation }: any) => {
     }
   };
 
+  // calculate progress percentage.
   const progressPercentage = Math.min((currentSteps / stepGoal) * 100, 100);
 
+  /**
+   * Get Motivational Message
+   */
   const getMotivationalMessage = (): string => {
     const percentage = (currentSteps / stepGoal) * 100;
     
@@ -233,6 +306,12 @@ export const FitnessScreen = ({ navigation }: any) => {
     return "Goal achieved!";
   };
 
+  /**
+   * Handle Reset Steps
+   * 
+   * - resets all step data including daily count, all-time total, and milestone progress.
+   * - requires user confirmation via alert dialog to prevent accidental resets.
+   */
   const handleResetSteps = () => {
     Alert.alert(
       'Reset Steps',
@@ -243,10 +322,12 @@ export const FitnessScreen = ({ navigation }: any) => {
           text: 'Reset',
           style: 'destructive',
           onPress: async () => {
+            // reset all state.
             setCurrentSteps(0);
             setTotalStepsAllTime(0);
             setFitnessTasks(prev => prev.map(t => ({ ...t, completed: false })));
             
+            // update Firestore.
             const user = auth.currentUser;
             if (user) {
               const fitnessRef = doc(db, 'fitnessStats', user.uid);
@@ -261,6 +342,7 @@ export const FitnessScreen = ({ navigation }: any) => {
     );
   };
 
+  // show loading state while fetching data.
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -271,6 +353,7 @@ export const FitnessScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* heart points display. */}
       <View style={styles.pointsContainer}>
         <View style={[styles.pointsBox, {
           backgroundColor: isDarkMode ? '#2a2a2a' : '#e8e8e8',
@@ -286,6 +369,7 @@ export const FitnessScreen = ({ navigation }: any) => {
         </View>
       </View>
 
+      {/* back navigation button. */}
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => navigation.goBack()}
@@ -302,6 +386,7 @@ export const FitnessScreen = ({ navigation }: any) => {
           FITNESS TRACKER
         </Text>
 
+        {/* main step counter card */}
         <View style={[styles.stepCard, {
           backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
         }]}>
@@ -318,6 +403,7 @@ export const FitnessScreen = ({ navigation }: any) => {
             Goal: {stepGoal.toLocaleString()} steps
           </Text>
 
+          {/* colour-coded progress bar. */}
           <View style={[styles.progressBarContainer, {
             backgroundColor: isDarkMode ? '#3a3a3a' : '#e0e0e0',
           }]}>
@@ -340,7 +426,7 @@ export const FitnessScreen = ({ navigation }: any) => {
           backgroundColor: isDarkMode ? '#2a2a2a' : '#f5f5f5',
         }]}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Statistics</Text>
-          
+          {/* calories burnt estimate. */}
           <View style={styles.statRow}>
             <View style={styles.statItem}>
               <Ionicons name="flame" size={30} color="#FF5722" />
@@ -352,6 +438,7 @@ export const FitnessScreen = ({ navigation }: any) => {
               </Text>
             </View>
 
+            {/* distance traveled estimate.*/}
             <View style={styles.statItem}>
               <Ionicons name="navigate" size={30} color="#2196F3" />
               <Text style={[styles.statValue, { color: theme.text }]}>
@@ -362,6 +449,7 @@ export const FitnessScreen = ({ navigation }: any) => {
               </Text>
             </View>
 
+            {/* activity time estimate. */}
             <View style={styles.statItem}>
               <Ionicons name="time" size={30} color="#FF9800" />
               <Text style={[styles.statValue, { color: theme.text }]}>
@@ -373,6 +461,7 @@ export const FitnessScreen = ({ navigation }: any) => {
             </View>
           </View>
 
+          {/* lifetime total steps. */}
           <View style={styles.totalStepsContainer}>
             <Ionicons name="trophy" size={24} color="#FFD700" />
             <View style={styles.totalStepsInfo}>
@@ -386,6 +475,7 @@ export const FitnessScreen = ({ navigation }: any) => {
           </View>
         </View>
 
+        {/* milestone achievements section. */}
         <View style={styles.milestonesSection}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>
             Today's Milestones
@@ -424,6 +514,7 @@ export const FitnessScreen = ({ navigation }: any) => {
                 </View>
               </View>
               
+              {/* checkmark icon for completed milestones. */}
               {task.completed && (
                 <Ionicons name="checkmark-circle" size={32} color="#4CAF50" />
               )}
@@ -431,6 +522,7 @@ export const FitnessScreen = ({ navigation }: any) => {
           ))}
         </View>
 
+        {/* warning if pedometer unavailable. */}
         {!isPedometerAvailable && (
           <View style={[styles.warningCard, {
             backgroundColor: isDarkMode ? '#3a2a2a' : '#fff3e0',
@@ -448,6 +540,7 @@ export const FitnessScreen = ({ navigation }: any) => {
   );
 };
 
+// style sheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,
